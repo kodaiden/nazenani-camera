@@ -4,7 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="なぜなに">
 <meta name="theme-color" content="#8b4513">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="/icon-192.png">
 <title>なぜ？なに？カメラ</title>
 <style>
   :root {
@@ -37,6 +41,17 @@
     cursor: pointer; backdrop-filter: blur(8px);
   }
   #bookBtn:active { transform: scale(0.95); }
+  .top-actions { display: flex; gap: 8px; align-items: center; }
+  #levelSelect {
+    background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4);
+    color: #fff; font-size: 13px; padding: 8px 10px; border-radius: 20px;
+    backdrop-filter: blur(8px); cursor: pointer;
+    -webkit-appearance: none; appearance: none;
+    padding-right: 26px;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='white' d='M0 0l5 6 5-6z'/></svg>");
+    background-repeat: no-repeat; background-position: right 10px center;
+  }
+  #levelSelect option { color: #000; background: #fff; }
 
   #shutterWrap {
     position: fixed; bottom: 0; left: 0; right: 0;
@@ -45,10 +60,14 @@
     z-index: 10;
   }
   #shutter {
-    width: 72px; height: 72px; border-radius: 50%;
-    background: #fff; border: 4px solid rgba(255,255,255,0.5);
+    width: 74px; height: 74px; border-radius: 50%;
+    background: #fff; border: none;
     cursor: pointer; box-shadow: 0 2px 12px rgba(0,0,0,0.4);
-    font-size: 28px;
+    position: relative;
+  }
+  #shutter::before {
+    content: ""; position: absolute; inset: 5px;
+    border-radius: 50%; border: 3px solid #000; opacity: 0.15;
   }
   #shutter:active { transform: scale(0.92); }
   #shutter:disabled { opacity: 0.4; cursor: wait; }
@@ -80,6 +99,22 @@
   }
   #result.loading { color: var(--muted); font-style: italic; }
   #result strong, #result b { color: var(--accent); }
+
+  .level-tabs {
+    display: flex; gap: 4px; margin: 8px 0 12px;
+    background: #ede7d8; padding: 3px; border-radius: 999px;
+  }
+  .level-tab {
+    flex: 1; border: none; background: transparent;
+    padding: 7px 4px; font-size: 12px; font-weight: 600;
+    border-radius: 999px; cursor: pointer; color: #666;
+    transition: all 0.15s;
+  }
+  .level-tab.active {
+    background: #fff; color: var(--accent);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  .level-tab:disabled { opacity: 0.4; cursor: wait; }
 
   /* 教科リンク強調 */
   #result .subject-block {
@@ -132,14 +167,22 @@
 
 <div id="topbar">
   <div>
-    <h1>📷 なぜ？なに？カメラ</h1>
+    <h1>なぜ？なに？カメラ</h1>
     <div class="sub">気になるものにかざしてタップ</div>
   </div>
-  <button id="bookBtn" onclick="openBook()">📚 図鑑</button>
+  <div class="top-actions">
+    <select id="levelSelect" title="解説レベル">
+      <option value="elementary">小学</option>
+      <option value="jhs">中学</option>
+      <option value="hs" selected>高校</option>
+      <option value="adult">大人</option>
+    </select>
+    <button id="bookBtn" onclick="openBook()">図鑑</button>
+  </div>
 </div>
 
 <div id="shutterWrap">
-  <button id="shutter" aria-label="撮影">📸</button>
+  <button id="shutter" aria-label="撮影"></button>
 </div>
 
 <!-- 解説シート -->
@@ -147,10 +190,17 @@
   <div class="handle" onclick="closeSheet()"></div>
   <div class="content">
     <div class="title">
-      <span>🔍 でんでんの解説</span>
+      <span>でんでんの解説</span>
       <div class="title-actions">
+        <button class="icon-btn" onclick="sendToManabiya()" title="まなびや家庭教師で掘る">🧑‍🏫 掘る</button>
         <button class="icon-btn" onclick="closeSheet()">閉じる</button>
       </div>
+    </div>
+    <div class="level-tabs" id="levelTabs" style="display:none;">
+      <button class="level-tab" data-level="elementary">小学</button>
+      <button class="level-tab" data-level="jhs">中学</button>
+      <button class="level-tab" data-level="hs">高校</button>
+      <button class="level-tab" data-level="adult">大人</button>
     </div>
     <img id="thumbnail" alt="" style="display:none">
     <div id="result">ここに解説が出ます</div>
@@ -162,7 +212,7 @@
   <div class="handle" onclick="closeBook()"></div>
   <div class="content">
     <div class="title">
-      <span>📚 図鑑（これまで見たもの）</span>
+      <span>図鑑（これまで見たもの）</span>
       <div class="title-actions">
         <button class="icon-btn" onclick="clearBook()">全削除</button>
         <button class="icon-btn" onclick="closeBook()">閉じる</button>
@@ -186,6 +236,21 @@ const errBanner = document.getElementById('errorBanner');
 const bookGrid = document.getElementById('bookGrid');
 
 const DB_KEY = 'zukan_v1';
+const LEVEL_KEY = 'zukan_level';
+
+// 現在のセッションの画像とレベル別結果キャッシュ
+let currentImage = null;
+let currentImageThumb = null;
+let currentLevelResults = {}; // { elementary: "...", hs: "..." }
+let currentActiveLevel = null;
+
+// レベル選択
+const levelSelect = document.getElementById('levelSelect');
+const savedLevel = localStorage.getItem(LEVEL_KEY);
+if (savedLevel) levelSelect.value = savedLevel;
+levelSelect.addEventListener('change', () => {
+  localStorage.setItem(LEVEL_KEY, levelSelect.value);
+});
 
 function showError(msg) {
   errBanner.textContent = msg;
@@ -199,8 +264,8 @@ function closeSheet() { sheet.classList.remove('open'); }
 // --- テキスト→HTML（マークダウン簡易 + 教科リンク装飾）---
 function renderText(text) {
   let t = (text || '').replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
-  // 📚 教科リンク以降を装飾ブロックに
-  const idx = t.indexOf('📚');
+  // ■ 教科リンク以降を装飾ブロックに
+  const idx = t.indexOf('■');
   if (idx >= 0) {
     const head = t.slice(0, idx);
     const tail = t.slice(idx);
@@ -261,7 +326,47 @@ function showBookItem(id) {
   thumb.style.display = 'block';
   result.className = '';
   result.innerHTML = renderText(item.text);
+  // 図鑑から開いた場合は元画像がないのでレベル切替不可
+  currentImage = null;
+  currentLevelResults = {};
+  setActiveLevelTab(null);
   openSheet();
+}
+
+// --- まなびや家庭教師へ送る ---
+const MANABIYA_URL = 'https://manabiya.pages.dev/';
+function extractCaption() {
+  // 解説テキストの最初の **太字** を優先、無ければ最初の行
+  const raw = (result?.textContent || '').trim();
+  const bold = raw.match(/\*\*(.+?)\*\*/) || (result?.innerHTML || '').match(/<(?:strong|b)[^>]*>([^<]+)<\/(?:strong|b)>/i);
+  if (bold && bold[1]) return bold[1].slice(0, 40);
+  const firstLine = raw.split('\n').map(s => s.trim()).find(Boolean) || '写真';
+  return firstLine.replace(/[#*_`]/g, '').slice(0, 40);
+}
+function sendToManabiya() {
+  const image = thumb?.src || currentImage;
+  if (!image) { alert('写真がありません'); return; }
+  const caption = extractCaption();
+
+  const targetOrigin = new URL(MANABIYA_URL).origin;
+  const w = window.open(MANABIYA_URL, 'manabiya');
+  if (!w) { alert('ポップアップがブロックされました。許可してください。'); return; }
+
+  let sent = false;
+  const send = () => {
+    if (sent) return; sent = true;
+    try { w.postMessage({ type: 'share_photo', image, caption }, targetOrigin); } catch {}
+  };
+  const onMsg = (e) => {
+    if (e.origin !== targetOrigin) return;
+    if (e.data?.type === 'manabiya_ready') {
+      send();
+      window.removeEventListener('message', onMsg);
+    }
+  };
+  window.addEventListener('message', onMsg);
+  // フォールバック: 3秒後に強制送信
+  setTimeout(send, 3000);
 }
 
 // --- カメラ ---
@@ -294,6 +399,72 @@ function makeThumb(dataUrl, size) {
   });
 }
 
+async function analyzeWithLevel(level, { skipCache = false } = {}) {
+  if (!currentImage) return;
+  setActiveLevelTab(level);
+
+  // キャッシュ確認
+  if (!skipCache && currentLevelResults[level]) {
+    result.className = '';
+    result.innerHTML = renderText(currentLevelResults[level]);
+    return;
+  }
+
+  result.className = 'loading';
+  result.textContent = '考え中（' + levelLabel(level) + '向け）...';
+  setLevelTabsDisabled(true);
+
+  try {
+    const res = await fetch('/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: currentImage, level })
+    });
+    const data = await res.json();
+    result.className = '';
+    if (data.error) {
+      result.textContent = '⚠ ' + data.error;
+    } else {
+      const text = data.text || '';
+      currentLevelResults[level] = text;
+      result.innerHTML = renderText(text);
+      // 最初のレベルのみ図鑑に保存（重複保存防止）
+      if (Object.keys(currentLevelResults).length === 1) {
+        addToBook(currentImageThumb, text);
+      }
+    }
+  } catch (e) {
+    result.className = '';
+    result.textContent = '通信エラー: ' + e.message;
+  } finally {
+    setLevelTabsDisabled(false);
+  }
+}
+
+function levelLabel(lv) {
+  return ({elementary:"小学生", jhs:"中学生", hs:"高校生", adult:"大人"})[lv] || lv;
+}
+function setActiveLevelTab(level) {
+  currentActiveLevel = level;
+  const tabs = document.getElementById('levelTabs');
+  tabs.style.display = currentImage ? 'flex' : 'none';
+  document.querySelectorAll('.level-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.level === level);
+  });
+}
+function setLevelTabsDisabled(disabled) {
+  document.querySelectorAll('.level-tab').forEach(t => t.disabled = disabled);
+}
+
+// レベルタブのイベント
+document.querySelectorAll('.level-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    const lv = tab.dataset.level;
+    if (lv === currentActiveLevel) return;
+    analyzeWithLevel(lv);
+  });
+});
+
 async function capture() {
   if (!video.videoWidth) { showError('カメラ準備中'); return; }
   shutter.disabled = true;
@@ -309,32 +480,27 @@ async function capture() {
   thumb.src = dataUrl;
   thumb.style.display = 'block';
 
-  try {
-    const res = await fetch('/analyze', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: dataUrl })
-    });
-    const data = await res.json();
-    result.className = '';
-    if (data.error) {
-      result.textContent = '⚠ ' + data.error;
-    } else {
-      const text = data.text || '';
-      result.innerHTML = renderText(text);
-      const thumbSmall = await makeThumb(dataUrl, 240);
-      addToBook(thumbSmall, text);
-    }
-  } catch (e) {
-    result.className = '';
-    result.textContent = '通信エラー: ' + e.message;
-  } finally {
-    shutter.disabled = false;
-  }
+  // 状態リセット
+  currentImage = dataUrl;
+  currentImageThumb = await makeThumb(dataUrl, 240);
+  currentLevelResults = {};
+  shutter.disabled = false;
+
+  // 現在の選択レベルで解析
+  await analyzeWithLevel(levelSelect.value);
 }
 
 shutter.addEventListener('click', capture);
 initCamera();
+
+// Service Worker 登録（PWA化）
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js')
+      .then(reg => console.log('SW registered:', reg.scope))
+      .catch(err => console.warn('SW registration failed:', err));
+  });
+}
 </script>
 </body>
 </html>

@@ -1,18 +1,27 @@
 @echo off
 chcp 65001 > nul
 cd /d "%~dp0"
+set PYTHONIOENCODING=utf-8
 
 echo ============================================
 echo   なぜ？なに？カメラ MVP
 echo ============================================
 echo.
 
-REM APIキーチェック
+REM APIキーチェック（優先順: 環境変数 → 保存ファイル → 手動入力）
 if "%ANTHROPIC_API_KEY%"=="" (
-  echo ⚠ ANTHROPIC_API_KEY が設定されていません。
-  echo.
-  set /p APIKEY="APIキーを貼り付けてEnter (console.anthropic.com): "
-  set ANTHROPIC_API_KEY=%APIKEY%
+  if exist "%USERPROFILE%\.anthropic_camera_key" (
+    echo ✅ 保存済みAPIキーを読み込みました
+    set /p ANTHROPIC_API_KEY=<"%USERPROFILE%\.anthropic_camera_key"
+  ) else (
+    echo ⚠ ANTHROPIC_API_KEY が設定されていません。
+    echo.
+    set /p APIKEY="APIキーを貼り付けてEnter (console.anthropic.com): "
+    set ANTHROPIC_API_KEY=%APIKEY%
+    REM 次回以降のために保存
+    echo %APIKEY%>"%USERPROFILE%\.anthropic_camera_key"
+    echo 💾 APIキーを保存しました: %USERPROFILE%\.anthropic_camera_key
+  )
 )
 
 REM 依存インストール（初回のみ）
