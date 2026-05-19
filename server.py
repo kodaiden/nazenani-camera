@@ -133,6 +133,11 @@ PROMPTS = {
 def index():
     return send_file(HERE / "index.html")
 
+@app.route("/eye-care")
+@app.route("/eye-care.html")
+def eye_care():
+    return send_file(HERE / "eye-care.html")
+
 # PWA用の静的ファイル配信
 @app.route("/manifest.json")
 def manifest():
