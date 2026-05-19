@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="目のケア">
+<meta name="theme-color" content="#2a6b8f">
+<link rel="icon" href="/favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="/icon-192.png">
+<title>目のケア — MacBook・iPad・iPhoneユーザー向け</title>
+<style>
+  :root {
+    --accent: #2a6b8f;
+    --accent2: #8b4513;
+    --bg: #f5f1e6;
+    --card: #fff;
+    --text: #222;
+    --muted: #666;
+    --ok: #2e7d32;
+    --warn: #c0392b;
+    --rest: #4a90e2;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+    color: var(--text); background: var(--bg);
+    line-height: 1.7; padding: 0 0 60px;
+  }
+
+  header {
+    background: linear-gradient(135deg, var(--accent), #1d4f6a);
+    color: #fff; padding: 24px 20px; text-align: center;
+  }
+  header h1 { margin: 0 0 6px; font-size: 22px; }
+  header .sub { font-size: 13px; opacity: 0.85; }
+  header .back {
+    display: inline-block; margin-top: 12px; color: #fff;
+    text-decoration: none; font-size: 13px;
+    background: rgba(255,255,255,0.15); padding: 6px 14px; border-radius: 20px;
+  }
+
+  main { max-width: 720px; margin: 0 auto; padding: 16px; }
+
+  .card {
+    background: var(--card); border-radius: 14px; padding: 18px 20px;
+    margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .card h2 {
+    margin: 0 0 12px; font-size: 17px; color: var(--accent);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .card h3 {
+    margin: 16px 0 6px; font-size: 15px; color: var(--accent2);
+  }
+  .card p { margin: 6px 0; font-size: 14px; }
+  .card ul { padding-left: 20px; margin: 6px 0; font-size: 14px; }
+  .card li { margin: 4px 0; }
+  .card .note {
+    font-size: 12px; color: var(--muted); margin-top: 8px;
+    padding: 8px 10px; background: #fafafa; border-radius: 6px;
+    border-left: 3px solid var(--accent);
+  }
+
+  /* 20-20-20 タイマー */
+  .timer-card { text-align: center; }
+  .timer-display {
+    font-size: 48px; font-weight: 700; color: var(--accent);
+    font-variant-numeric: tabular-nums; margin: 8px 0;
+  }
+  .timer-display.rest { color: var(--rest); }
+  .timer-status { font-size: 14px; color: var(--muted); margin-bottom: 12px; }
+  .timer-buttons { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    border: none; padding: 10px 20px; font-size: 14px;
+    border-radius: 22px; cursor: pointer; font-weight: 600;
+    background: var(--accent); color: #fff;
+  }
+  .btn:active { transform: scale(0.96); }
+  .btn.secondary { background: #ddd; color: var(--text); }
+  .btn.danger { background: var(--warn); }
+
+  /* デバイスタブ */
+  .device-tabs {
+    display: flex; gap: 4px; background: #ede7d8;
+    padding: 4px; border-radius: 999px; margin-bottom: 12px;
+  }
+  .device-tab {
+    flex: 1; border: none; background: transparent;
+    padding: 9px 4px; font-size: 13px; font-weight: 600;
+    border-radius: 999px; cursor: pointer; color: #666;
+    transition: all 0.15s;
+  }
+  .device-tab.active {
+    background: #fff; color: var(--accent);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  .device-panel { display: none; }
+  .device-panel.active { display: block; }
+
+  /* チェックリスト */
+  .checklist { list-style: none; padding: 0; }
+  .checklist li {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 10px; border-bottom: 1px solid #eee;
+    font-size: 14px;
+  }
+  .checklist li:last-child { border-bottom: none; }
+  .checklist input[type=checkbox] {
+    margin-top: 3px; width: 18px; height: 18px;
+    accent-color: var(--accent); flex-shrink: 0;
+  }
+  .checklist .path {
+    display: block; font-size: 12px; color: var(--muted);
+    margin-top: 2px; font-family: "SF Mono", Menlo, monospace;
+  }
+  .checklist .desc { line-height: 1.5; }
+
+  /* 体操ボタン */
+  .exercise-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px; margin-top: 10px;
+  }
+  .exercise-btn {
+    background: #f0e9d8; border: none; padding: 12px;
+    border-radius: 10px; cursor: pointer; text-align: center;
+    font-size: 13px; font-weight: 600; color: var(--accent2);
+  }
+  .exercise-btn:active { transform: scale(0.96); }
+  .exercise-icon { font-size: 28px; display: block; margin-bottom: 4px; }
+
+  /* 体操モーダル */
+  .modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+    display: none; align-items: center; justify-content: center;
+    z-index: 100; padding: 20px;
+  }
+  .modal.open { display: flex; }
+  .modal-content {
+    background: #fff; border-radius: 14px; padding: 24px;
+    max-width: 360px; width: 100%; text-align: center;
+  }
+  .modal-content h3 { margin-top: 0; color: var(--accent); }
+  .modal-content .step {
+    font-size: 16px; line-height: 1.6; margin: 12px 0;
+  }
+  .modal-content .count {
+    font-size: 56px; font-weight: 700; color: var(--accent);
+    margin: 12px 0; font-variant-numeric: tabular-nums;
+  }
+
+  .badge {
+    display: inline-block; background: #eef4f8; color: var(--accent);
+    font-size: 11px; padding: 2px 8px; border-radius: 10px;
+    margin-left: 6px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>👀 目のケア</h1>
+  <div class="sub">MacBook・iPad・iPhoneユーザー向け設定とケア</div>
+  <a href="/" class="back">← カメラに戻る</a>
+</header>
+
+<main>
+
+  <!-- 20-20-20 タイマー -->
+  <div class="card timer-card">
+    <h2>⏱ 20-20-20タイマー</h2>
+    <p style="font-size:13px; color:var(--muted); margin-bottom: 8px;">
+      <b>20分ごとに、20フィート（約6m）先を、20秒見る</b><br>
+      米国眼科学会推奨のデジタル眼精疲労対策
+    </p>
+    <div class="timer-display" id="timerDisplay">20:00</div>
+    <div class="timer-status" id="timerStatus">準備中</div>
+    <div class="timer-buttons">
+      <button class="btn" id="timerToggle">スタート</button>
+      <button class="btn secondary" id="timerReset">リセット</button>
+    </div>
+    <div class="note" id="timerNote">
+      💡 バックグラウンドでも動作。休憩時間になると通知音が鳴ります（音量ON推奨）。
+    </div>
+  </div>
+
+  <!-- デバイス別おすすめ設定 -->
+  <div class="card">
+    <h2>⚙️ デバイス別おすすめ設定</h2>
+    <p style="font-size:13px; color:var(--muted);">
+      よく使うMacBook・iPad・iPhoneの「目に優しい設定」チェックリスト。タップで開閉。
+    </p>
+
+    <div class="device-tabs">
+      <button class="device-tab active" data-device="mac">💻 MacBook</button>
+      <button class="device-tab" data-device="ipad">📱 iPad</button>
+      <button class="device-tab" data-device="iphone">📱 iPhone</button>
+    </div>
+
+    <!-- MacBook -->
+    <div class="device-panel active" data-device="mac">
+      <ul class="checklist">
+        <li>
+          <input type="checkbox" id="mac1">
+          <label for="mac1" class="desc">
+            <b>Night Shift</b>を日没〜日の出に設定<span class="badge">推奨</span>
+            <span class="path">システム設定 → ディスプレイ → Night Shift</span>
+            画面の青色光を抑え、就寝前の眠りやすさにも影響。
+          </label>
+        </li>
+        <li>
+          <input type="checkbox" id="mac2">
+          <label for="mac2" class="desc">
+            <b>True Tone</b>をオン
+            <span class="path">システム設定 → ディスプレイ → True Tone</span>
+            周囲の色温度に合わせて画面が自動調整、目の負担を軽減。
+          </label>
+        </li>
+        <li>
+          <input type="checkbox" id="mac3">
+          <label for="mac3" class="desc">
+            <b>輝度の自動調整</b>をオン
+            <span class="path">システム設定 → ディスプレイ → 輝度を自動調節</span>
+            暗い場所で明るすぎる画面 = 一番の目疲れ原因。
+          </label>
+        </li>
+        <li>
+          <input type="checkbox" id="mac4">
+          <label for="mac4" class="desc">
+            <b>テキストサイズを少し大きく</b>
+            <span class="path">システム設定 → アクセシビリティ → 表示 → テキストサイズが大きく</span>
+            または Safari でズーム（⌘+）を常用。
+          </label>
+        </li>
+        <li>
+          <input type="checkbox" id="mac5">
+          <label for="mac5" class="desc">
+            <b>画面との距離は50-70cm</b>、視線がやや下向きに
+            <span class="path">スタンド or 外部モニターで目線の高さを調整</span>
+            ノートPCをそのまま使うと首と目に負担。スタンド推奨。
+          </label>
+        </li>
+        <li>
+          <input type="checkbox" id="mac6">
+          <label for="mac6" class="desc">
+            <b>ダークモード</b>を夜間自動
+            <span class="path">システム設定 → 外観 → 自動</span>
+            夜の眩しさを軽減。明るい部屋ではライトモードのままでOK。
+          </label>
+        </li>
+      </ul>
+    </div>
+
+    <!-- iPad -->
+    <div class="device-panel" data-device="ipad">
+      <ul class="checklist">
+        <li>
+          <input type="checkbox" id="ipad1">
+          <label for="ipad1" class="desc">
+            <b>Night Shift</b>を日没〜日の出
+            <span class="path">設定 → 画面表示と明るさ → Night Shift</span>
+          </label>
+        </li>
+        <li>
+          <input type="checkbox" id="ipad2">
+          <label for="ipad2" class="desc">
+            <b>True Tone</b>をオン
+            <span class="path">設定 → 画面表示と明るさ → True Tone</span>
+          </label>
+        </li>
+        <li>
+          <input type="checkbox" id="ipad3">
+          <label for="ipad3" class="desc">
+            <b>明るさの自動調節</b>をオン<span class="badge">重要</span>
+            <span class="path">設定 → アクセシビリティ → 画面表示とテキストサイズ → 明るさの自動調節</span>
+          </label>
+        </li>
+        <li>
+          <input type="checkbox" id="ipad4">
+          <label for="ipad4" class="desc">
+            <b>ホワイトポイントを下げる</b>
+            <span class="path">設定 → アクセシビリティ → 画面表示とテキストサイズ → ホワイトポイントを下げる</span>
+            最大輝度をさらに抑える。眩しさが気になる人向け。
+          </label>
+        </li>
+        <li>
+          <input type="checkbox" id="ipad5">
+          <label for="ipad5" class="desc">
+            <b>テキストを太く</b> + <b>大きな文字</b>
+            <span class="path">設定 → アクセシビリティ → 画面表示とテキストサイズ</span>
+          </label>
+        </li>
+        <li>
+          <input type="checkbox" id="ipad6">
+          <label for="ipad6" class="desc">
+            <b>画面との距離は40cm以上</b>
+            <span class="path">「画面との距離」機能をオン: 設定 → スクリーンタイム → 画面との距離</span>
+            iPad/iPhoneは近づけがち。30cm以下で警告してくれる。
+          </label>
+        </li>
+        <li>
+          <input type="checkbox" id="ipad7">
+          <label for="ipad7" class="desc">
+            <b>スクリーンタイムで休憩設定</b>
+            <span class="path">設定 → スクリーンタイム → 休止時間</span>
+          </label>
+        </li>
+      </ul>
+    </div>
+
+    <!-- iPhone -->
+    <div class="device-panel" data-device="iphone">
+      <ul class="checklist">
+        <li>
+          <input type="checkbox" id="iph1">
+          <label for="iph1" class="desc">
+            <b>Night Shift</b>を日没〜日の出
+            <span class="path">設定 → 画面表示と明るさ → Night Shift</span>
+          </label>
+        </li>
+        <li>
+          <input type="checkbox" id="iph2">
+          <label for="iph2" class="desc">
+            <b>True Tone</b>をオン
+            <span class="path">設定 → 画面表示と明るさ → True Tone</span>
+          </label>
+        </li>
+        <li>
+          <input type="checkbox" id="iph3">
+          <label for="iph3" class="desc">
+            <b>明るさの自動調節</b>をオン<span class="badge">重要</span>
+            <span class="path">設定 → アクセシビリティ → 画面表示とテキストサイズ → 明るさの自動調節</span>
+            これだけでも目の疲れが大きく変わる。
+          </label>
+        </li>
+        <li>
+          <input type="checkbox" id="iph4">
+          <label for="iph4" class="desc">
+            <b>ホワイトポイントを下げる</b>
+            <span class="path">設定 → アクセシビリティ → 画面表示とテキストサイズ → ホワイトポイントを下げる</span>
+          </label>
+        </li>
+        <li>
+          <input type="checkbox" id="iph5">
+          <label for="iph5" class="desc">
+            <b>ダークモード</b>を自動
+            <span class="path">設定 → 画面表示と明るさ → 外観モード → 自動</span>
+          </label>
+        </li>
+        <li>
+          <input type="checkbox" id="iph6">
+          <label for="iph6" class="desc">
+            <b>画面との距離</b>機能をオン<span class="badge">推奨</span>
+            <span class="path">設定 → スクリーンタイム → 画面との距離</span>
+            iPhoneを30cm以下に近づけると警告。子どもの近視予防にも有効。
+          </label>
+        </li>
+        <li>
+          <input type="checkbox" id="iph7">
+          <label for="iph7" class="desc">
+            <b>就寝1時間前は使わない</b> or <b>おやすみモード</b>
+            <span class="path">設定 → 集中モード → 睡眠</span>
+            ブルーライト以上に「画面の刺激そのもの」が睡眠の質を落とす。
+          </label>
+        </li>
+        <li>
+          <input type="checkbox" id="iph8">
+          <label for="iph8" class="desc">
+            <b>テキストサイズ大</b> + <b>視差効果を減らす</b>
+            <span class="path">設定 → アクセシビリティ → 画面表示とテキストサイズ</span>
+          </label>
+        </li>
+      </ul>
+    </div>
+    <div class="note">
+      ✅ チェック状態はこのブラウザに保存されます。各デバイスで開いて設定→チェックの流れがおすすめ。
+    </div>
+  </div>
+
+  <!-- 目の体操 -->
+  <div class="card">
+    <h2>💪 すぐできる目の体操</h2>
+    <p style="font-size:13px; color:var(--muted);">タップでガイド開始。デスクで気付いた時にどうぞ。</p>
+    <div class="exercise-grid">
+      <button class="exercise-btn" data-ex="palming">
+        <span class="exercise-icon">🤲</span>パーミング<br><small>30秒</small>
+      </button>
+      <button class="exercise-btn" data-ex="blink">
+        <span class="exercise-icon">😌</span>意識的まばたき<br><small>20回</small>
+      </button>
+      <button class="exercise-btn" data-ex="focus">
+        <span class="exercise-icon">🎯</span>遠近ピント<br><small>10回</small>
+      </button>
+      <button class="exercise-btn" data-ex="circle">
+        <span class="exercise-icon">🔄</span>眼球グルグル<br><small>左右各5回</small>
+      </button>
+      <button class="exercise-btn" data-ex="warm">
+        <span class="exercise-icon">♨️</span>ホットアイ<br><small>1分</small>
+      </button>
+      <button class="exercise-btn" data-ex="far">
+        <span class="exercise-icon">🌅</span>遠くを見る<br><small>20秒</small>
+      </button>
+    </div>
+  </div>
+
+  <!-- 姿勢・環境 -->
+  <div class="card">
+    <h2>🪑 姿勢・環境チェック</h2>
+    <h3>画面までの距離の目安</h3>
+    <ul>
+      <li><b>MacBook</b>: 50〜70cm（腕を伸ばして指先が届くくらい）</li>
+      <li><b>iPad</b>: 40〜50cm</li>
+      <li><b>iPhone</b>: 30〜40cm（近づけすぎ注意）</li>
+    </ul>
+    <h3>視線の角度</h3>
+    <ul>
+      <li>画面の上端が目線と<b>同じか少し下</b></li>
+      <li>下向き<b>10〜20度</b>がベスト（まぶたが自然に閉じ気味になり、ドライアイ予防）</li>
+    </ul>
+    <h3>照明</h3>
+    <ul>
+      <li>画面と背景の明るさの差を小さく（暗闇でMacは目に悪い）</li>
+      <li>窓は画面の<b>真横</b>に配置（反射と逆光を避ける）</li>
+    </ul>
+    <div class="note">
+      🔧 MacBookは画面が低くなりがち。<b>スタンド + 外付けキーボード</b>に投資する価値あり。
+    </div>
+  </div>
+
+  <!-- ドライアイ・違和感サイン -->
+  <div class="card">
+    <h2>🚨 こんなサインは要注意</h2>
+    <ul>
+      <li>夕方になると焦点が合いにくい</li>
+      <li>目の奥が重い・頭痛</li>
+      <li>充血・しょぼしょぼする</li>
+      <li>近くを見た後、遠くがぼやける時間が長い</li>
+      <li>肩こり・首こりを伴う</li>
+    </ul>
+    <p style="font-size:13px;">
+      → 1〜2週間続くなら<b>眼科で検査</b>を。コンタクトの度数・PC用メガネ・ドライアイの治療など、解決策がある。
+    </p>
+  </div>
+
+</main>
+
+<!-- 体操モーダル -->
+<div class="modal" id="modal">
+  <div class="modal-content">
+    <h3 id="modalTitle">体操</h3>
+    <div class="step" id="modalStep">準備</div>
+    <div class="count" id="modalCount">--</div>
+    <button class="btn" id="modalClose">閉じる</button>
+  </div>
+</div>
+
+<script>
+// ========== 20-20-20 タイマー ==========
+const WORK_SEC = 20 * 60;
+const REST_SEC = 20;
+
+const timerDisplay = document.getElementById('timerDisplay');
+const timerStatus = document.getElementById('timerStatus');
+const timerToggle = document.getElementById('timerToggle');
+const timerReset = document.getElementById('timerReset');
+
+let timerRunning = false;
+let timerMode = 'work'; // work | rest
+let remaining = WORK_SEC;
+let intervalId = null;
+
+function fmt(sec) {
+  const m = Math.floor(sec / 60).toString().padStart(2, '0');
+  const s = (sec % 60).toString().padStart(2, '0');
+  return `${m}:${s}`;
+}
+
+function renderTimer() {
+  timerDisplay.textContent = fmt(remaining);
+  if (timerMode === 'work') {
+    timerDisplay.classList.remove('rest');
+    timerStatus.textContent = timerRunning ? '👀 作業中（20分後に休憩アラーム）' : '一時停止中';
+  } else {
+    timerDisplay.classList.add('rest');
+    timerStatus.textContent = '🌅 20秒間、遠く（6m先）を見てね';
+  }
+}
+
+function beep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.value = 660;
+    gain.gain.setValueAtTime(0.2, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.5);
+    setTimeout(() => {
+      const o2 = ctx.createOscillator();
+      const g2 = ctx.createGain();
+      o2.connect(g2); g2.connect(ctx.destination);
+      o2.frequency.value = 880;
+      g2.gain.setValueAtTime(0.2, ctx.currentTime);
+      g2.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+      o2.start(); o2.stop(ctx.currentTime + 0.5);
+    }, 300);
+  } catch {}
+}
+
+function notify(title, body) {
+  if ('Notification' in window && Notification.permission === 'granted') {
+    try { new Notification(title, { body, icon: '/icon-192.png' }); } catch {}
+  }
+}
+
+function tick() {
+  remaining--;
+  if (remaining <= 0) {
+    if (timerMode === 'work') {
+      timerMode = 'rest';
+      remaining = REST_SEC;
+      beep();
+      notify('👀 目の休憩タイム', '20秒間、遠く（約6m先）を見てください');
+    } else {
+      timerMode = 'work';
+      remaining = WORK_SEC;
+      beep();
+      notify('✅ 休憩おしまい', '作業再開OK！次は20分後');
+    }
+  }
+  renderTimer();
+}
+
+timerToggle.addEventListener('click', () => {
+  if (timerRunning) {
+    timerRunning = false;
+    clearInterval(intervalId);
+    timerToggle.textContent = '再開';
+  } else {
+    timerRunning = true;
+    timerToggle.textContent = '一時停止';
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+    intervalId = setInterval(tick, 1000);
+  }
+  renderTimer();
+});
+
+timerReset.addEventListener('click', () => {
+  timerRunning = false;
+  clearInterval(intervalId);
+  timerMode = 'work';
+  remaining = WORK_SEC;
+  timerToggle.textContent = 'スタート';
+  renderTimer();
+});
+
+renderTimer();
+
+// ========== デバイスタブ ==========
+document.querySelectorAll('.device-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    const dev = tab.dataset.device;
+    document.querySelectorAll('.device-tab').forEach(t => t.classList.toggle('active', t === tab));
+    document.querySelectorAll('.device-panel').forEach(p => {
+      p.classList.toggle('active', p.dataset.device === dev);
+    });
+  });
+});
+
+// ========== チェックリスト永続化 ==========
+const CHECK_KEY = 'eyecare_checks_v1';
+function loadChecks() {
+  try { return JSON.parse(localStorage.getItem(CHECK_KEY) || '{}'); }
+  catch { return {}; }
+}
+function saveChecks(state) {
+  try { localStorage.setItem(CHECK_KEY, JSON.stringify(state)); } catch {}
+}
+const checkState = loadChecks();
+document.querySelectorAll('.checklist input[type=checkbox]').forEach(cb => {
+  if (checkState[cb.id]) cb.checked = true;
+  cb.addEventListener('change', () => {
+    checkState[cb.id] = cb.checked;
+    saveChecks(checkState);
+  });
+});
+
+// ========== 目の体操 ==========
+const EXERCISES = {
+  palming: {
+    title: '🤲 パーミング',
+    steps: [
+      { text: '手のひらをこすって温める', sec: 5 },
+      { text: '目を閉じ、温めた手を軽く目に当てる', sec: 25 },
+      { text: 'ゆっくり手を離し、目を開く', sec: 3 },
+    ],
+  },
+  blink: {
+    title: '😌 意識的まばたき',
+    steps: [
+      { text: 'ゆっくり強く目を閉じる→開く×20回', sec: 30 },
+    ],
+  },
+  focus: {
+    title: '🎯 遠近ピント切り替え',
+    steps: [
+      { text: '指先を顔の前30cmに立てて見つめる', sec: 5 },
+      { text: '次は窓の外など遠く（6m以上先）を見る', sec: 5 },
+      { text: 'これを交互に10回繰り返す', sec: 30 },
+    ],
+  },
+  circle: {
+    title: '🔄 眼球グルグル',
+    steps: [
+      { text: '顔は動かさず、目だけ右回りに5周', sec: 15 },
+      { text: '次に左回りに5周', sec: 15 },
+    ],
+  },
+  warm: {
+    title: '♨️ ホットアイ（蒸しタオル代用）',
+    steps: [
+      { text: '手のひらを30秒こすり合わせて温める', sec: 30 },
+      { text: '目を閉じて手のひらを当てる', sec: 30 },
+    ],
+  },
+  far: {
+    title: '🌅 遠くを見る',
+    steps: [
+      { text: '窓の外、もしくは部屋の一番奥（6m以上）を眺める', sec: 20 },
+    ],
+  },
+};
+
+const modal = document.getElementById('modal');
+const modalTitle = document.getElementById('modalTitle');
+const modalStep = document.getElementById('modalStep');
+const modalCount = document.getElementById('modalCount');
+const modalClose = document.getElementById('modalClose');
+
+let modalTimer = null;
+
+function runExercise(key) {
+  const ex = EXERCISES[key];
+  if (!ex) return;
+  modalTitle.textContent = ex.title;
+  modal.classList.add('open');
+
+  let stepIdx = 0;
+  let secLeft = ex.steps[0].sec;
+
+  const renderModal = () => {
+    modalStep.textContent = ex.steps[stepIdx].text;
+    modalCount.textContent = secLeft + 's';
+  };
+  renderModal();
+
+  clearInterval(modalTimer);
+  modalTimer = setInterval(() => {
+    secLeft--;
+    if (secLeft < 0) {
+      stepIdx++;
+      if (stepIdx >= ex.steps.length) {
+        clearInterval(modalTimer);
+        modalStep.textContent = '完了！👏';
+        modalCount.textContent = '✓';
+        beep();
+        return;
+      }
+      secLeft = ex.steps[stepIdx].sec;
+    }
+    renderModal();
+  }, 1000);
+}
+
+document.querySelectorAll('.exercise-btn').forEach(btn => {
+  btn.addEventListener('click', () => runExercise(btn.dataset.ex));
+});
+
+modalClose.addEventListener('click', () => {
+  clearInterval(modalTimer);
+  modal.classList.remove('open');
+});
+modal.addEventListener('click', (e) => {
+  if (e.target === modal) {
+    clearInterval(modalTimer);
+    modal.classList.remove('open');
+  }
+});
+</script>
+</body>
+</html>

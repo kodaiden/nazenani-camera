@@ -35,12 +35,13 @@
   }
   #topbar h1 { margin: 0; font-size: 16px; font-weight: 700; }
   #topbar .sub { font-size: 11px; opacity: 0.8; }
-  #bookBtn {
+  #bookBtn, #eyeBtn {
     background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4);
     color: #fff; font-size: 13px; padding: 8px 14px; border-radius: 20px;
     cursor: pointer; backdrop-filter: blur(8px);
+    text-decoration: none; display: inline-block;
   }
-  #bookBtn:active { transform: scale(0.95); }
+  #bookBtn:active, #eyeBtn:active { transform: scale(0.95); }
   .top-actions { display: flex; gap: 8px; align-items: center; }
   #levelSelect {
     background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4);
@@ -178,6 +179,7 @@
       <option value="adult">大人</option>
     </select>
     <button id="bookBtn" onclick="openBook()">図鑑</button>
+    <a id="eyeBtn" href="/eye-care" title="目のケア">👀</a>
   </div>
 </div>
 
