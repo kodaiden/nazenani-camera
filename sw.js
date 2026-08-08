@@ -2,7 +2,7 @@
    - 静的ファイル（HTML/CSS/JS/アイコン）はキャッシュから返す
    - API呼び出し（/analyze）は常にネットワーク
 */
-const CACHE = "nazenani-v1";
+const CACHE = "nazenani-v2";
 const STATIC_ASSETS = [
   "/",
   "/manifest.json",

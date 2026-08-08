@@ -41,6 +41,16 @@
     cursor: pointer; backdrop-filter: blur(8px);
   }
   #bookBtn:active { transform: scale(0.95); }
+  #lightBtn {
+    background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4);
+    color: #fff; font-size: 15px; padding: 7px 12px; border-radius: 20px;
+    cursor: pointer; backdrop-filter: blur(8px);
+    display: none; /* トーチ対応端末でのみ表示 */
+  }
+  #lightBtn:active { transform: scale(0.95); }
+  #lightBtn.on {
+    background: #ffd54f; border-color: #ffd54f; color: #5a4500;
+  }
   .top-actions { display: flex; gap: 8px; align-items: center; }
   #levelSelect {
     background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4);
@@ -171,6 +181,7 @@
     <div class="sub">気になるものにかざしてタップ</div>
   </div>
   <div class="top-actions">
+    <button id="lightBtn" onclick="toggleLight()" title="あかり（ライト）" aria-label="ライト点灯/消灯">💡</button>
     <select id="levelSelect" title="解説レベル">
       <option value="elementary">小学</option>
       <option value="jhs">中学</option>
@@ -370,6 +381,10 @@ function sendToManabiya() {
 }
 
 // --- カメラ ---
+let videoTrack = null;
+let lightOn = false;
+const lightBtn = document.getElementById('lightBtn');
+
 async function initCamera() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
@@ -377,8 +392,30 @@ async function initCamera() {
       audio: false
     });
     video.srcObject = stream;
+    videoTrack = stream.getVideoTracks()[0];
+    setupLight();
   } catch (e) {
     showError('カメラ使用不可: ' + e.message);
+  }
+}
+
+// --- あかり（トーチ） ---
+function setupLight() {
+  if (!videoTrack || typeof videoTrack.getCapabilities !== 'function') return;
+  try {
+    const caps = videoTrack.getCapabilities();
+    if (caps.torch) lightBtn.style.display = 'block';
+  } catch {}
+}
+
+async function toggleLight() {
+  if (!videoTrack) return;
+  try {
+    await videoTrack.applyConstraints({ advanced: [{ torch: !lightOn }] });
+    lightOn = !lightOn;
+    lightBtn.classList.toggle('on', lightOn);
+  } catch (e) {
+    showError('ライトを操作できません: ' + e.message);
   }
 }
 
