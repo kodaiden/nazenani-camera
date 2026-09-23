@@ -12,6 +12,8 @@ HERE = Path(__file__).parent
 app = Flask(__name__)
 client = Anthropic()  # ANTHROPIC_API_KEY 環境変数を読む
 
+MODEL = "claude-sonnet-4-5"
+
 PROMPT_ELEMENTARY = """あなたは「でんでん」という家庭教師ペルソナ。小学生の好奇心をくすぐる案内人です。
 
 画像を見て、次の構成で語ってください（全体で400字以内）。**ひらがな多め、やさしい言葉**で。
@@ -167,7 +169,7 @@ def analyze():
 
     try:
         resp = client.messages.create(
-            model="claude-sonnet-4-5",
+            model=MODEL,
             max_tokens=1200,
             system=system_prompt,
             messages=[{
@@ -189,6 +191,129 @@ def analyze():
         return jsonify({"text": text})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+# ============================================================
+# Ankiカード化 — 教材の写真を「1項目1枚」の暗記カードに変換する
+# ============================================================
+
+PROMPT_ANKI = """あなたは暗記カード作成のプロ。写真に写っている教材（問題集・白地図・年表・板書・教科書・ノート）を読み取り、Anki用のカードに変換します。
+
+## 絶対ルール
+
+1. **1項目 = 1枚**。まとめない。空欄が13個なら13枚、記号がA〜Pの16個なら16枚つくる。写真の中の設問・空欄・番号・記号を**ひとつ残らず**カードにすること。
+2. 解答欄が空白でも、**図・地図・文脈から正解を推測して埋める**。「空欄」「不明」で終わらせない。
+3. front（表）は**それ単体で答えられる問い**にする。
+   - ×「①は？」
+   - ○「【南北アメリカ・白地図】① 北アメリカ大陸の北にひろがる海は？」
+   - 資料名＋記号＋位置の手がかり、をセットで書く。
+4. back（裏）は**答えだけ**を短く。説明は note に回す。
+5. note は任意。覚え方・位置の目印・ひっかけ注意を1行で。
+6. confidence は自己申告の確からしさ。
+   - high: 誌面に答えが書いてある／図から一意に決まる
+   - medium: 図から推測したが妥当
+   - low: 写真が不鮮明・判断に迷う（それでも最有力候補を back に入れる）
+7. tags は Anki のタグ。空白を含めず、`地理`『南北アメリカ』のように短く。日本語でよい。
+
+## 出力
+
+必ず emit_cards ツールを呼んで返すこと。地の文は書かない。
+写真に教材が写っていない場合は cards を空配列にし、note_to_user に「何を撮ればいいか」を書く。
+"""
+
+ANKI_TOOL = {
+    "name": "emit_cards",
+    "description": "読み取った教材から暗記カードの一覧を出力する",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "deck": {
+                "type": "string",
+                "description": "デッキ名。例『地理::南北アメリカ』（Ankiは :: で階層になる）",
+            },
+            "source": {
+                "type": "string",
+                "description": "教材の名前・単元名。例『南北アメリカ 風土・行政（白地図）』",
+            },
+            "note_to_user": {
+                "type": "string",
+                "description": "カードが作れなかった場合の理由や、撮り直しの指示（通常は空文字）",
+            },
+            "cards": {
+                "type": "array",
+                "description": "暗記カード。教材の1項目につき1枚。",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "front": {"type": "string", "description": "表：単体で答えられる問い"},
+                        "back": {"type": "string", "description": "裏：答えのみ。短く"},
+                        "note": {"type": "string", "description": "補足・覚え方（任意）"},
+                        "tags": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Ankiタグ（空白を含めない）",
+                        },
+                        "confidence": {
+                            "type": "string",
+                            "enum": ["high", "medium", "low"],
+                            "description": "答えの確からしさ",
+                        },
+                    },
+                    "required": ["front", "back", "confidence"],
+                },
+            },
+        },
+        "required": ["deck", "cards"],
+    },
+}
+
+
+@app.route("/anki", methods=["POST"])
+def anki():
+    """教材の写真 → Ankiカード(JSON)。1項目1枚で返す。"""
+    data = request.get_json(force=True)
+    image_b64 = data.get("image", "")
+    if "," in image_b64:
+        image_b64 = image_b64.split(",", 1)[1]
+
+    if not image_b64:
+        return jsonify({"error": "画像が空"}), 400
+
+    try:
+        resp = client.messages.create(
+            model=MODEL,
+            max_tokens=8000,
+            system=PROMPT_ANKI,
+            tools=[ANKI_TOOL],
+            tool_choice={"type": "tool", "name": "emit_cards"},
+            messages=[{
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "image/jpeg",
+                            "data": image_b64,
+                        },
+                    },
+                    {"type": "text", "text": "この教材、1項目ずつAnkiカードにして。空欄は答えを埋めて。"},
+                ],
+            }],
+        )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+    for block in resp.content:
+        if block.type == "tool_use" and block.name == "emit_cards":
+            payload = dict(block.input)
+            payload.setdefault("cards", [])
+            payload.setdefault("deck", "なぜなにカメラ")
+            payload.setdefault("source", "")
+            payload.setdefault("note_to_user", "")
+            return jsonify(payload)
+
+    return jsonify({"error": "カードを作れなかった。もう一度撮ってみて"}), 502
 
 
 if __name__ == "__main__":

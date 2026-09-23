@@ -1,8 +1,8 @@
 /* Service Worker for なぜ？なに？カメラ
    - 静的ファイル（HTML/CSS/JS/アイコン）はキャッシュから返す
-   - API呼び出し（/analyze）は常にネットワーク
+   - API呼び出し（/analyze, /anki）は常にネットワーク
 */
-const CACHE = "nazenani-v1";
+const CACHE = "nazenani-v2";
 const STATIC_ASSETS = [
   "/",
   "/manifest.json",
@@ -34,7 +34,7 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
   // API呼び出しはキャッシュせずネットワーク直行
-  if (url.pathname === "/analyze") {
+  if (url.pathname === "/analyze" || url.pathname === "/anki") {
     return; // デフォルト動作（ネットワーク）に任せる
   }
 

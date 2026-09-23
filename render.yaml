@@ -3,7 +3,7 @@ services:
     name: nazenani-camera
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn server:app --timeout 60
+    startCommand: gunicorn server:app --timeout 180
     envVars:
       - key: ANTHROPIC_API_KEY
         sync: false

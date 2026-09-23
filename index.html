@@ -155,6 +155,65 @@
     color: #fff; font-size: 10px; padding: 4px 6px;
   }
   .book-empty { color: var(--muted); text-align: center; padding: 40px 20px; font-size: 14px; }
+
+  /* モード切替（解説 / カード） */
+  #modeSwitch {
+    display: flex; gap: 3px; margin-top: 8px;
+    background: rgba(0,0,0,0.35); padding: 3px; border-radius: 999px;
+    backdrop-filter: blur(8px); width: max-content;
+  }
+  .mode-btn {
+    border: none; background: transparent; color: rgba(255,255,255,0.75);
+    font-size: 12px; font-weight: 700; padding: 6px 14px;
+    border-radius: 999px; cursor: pointer;
+  }
+  .mode-btn.active { background: #fff; color: var(--accent); }
+
+  /* Ankiカード */
+  #cardMeta { font-size: 12px; color: var(--muted); margin-bottom: 10px; }
+  #deckName {
+    width: 100%; padding: 8px 10px; font-size: 14px; margin-bottom: 12px;
+    border: 1px solid #d8d0bd; border-radius: 8px; background: #fff;
+  }
+  .ank-card {
+    background: var(--card); border-radius: 10px; padding: 10px 12px;
+    margin-bottom: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  }
+  .ank-card.off { opacity: 0.4; }
+  .ank-head {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 11px; color: var(--muted); margin-bottom: 6px;
+  }
+  .ank-head input[type=checkbox] { width: 16px; height: 16px; }
+  .badge { border-radius: 999px; padding: 2px 8px; font-size: 10px; font-weight: 700; }
+  .badge.high { background: #e4f1e4; color: #2e7d32; }
+  .badge.medium { background: #fdf3d8; color: #a6791b; }
+  .badge.low { background: #fbe3e0; color: #c0392b; }
+  .ank-card input[type=text] {
+    width: 100%; border: none; border-bottom: 1px dashed #ddd;
+    padding: 5px 2px; font-size: 14px; font-family: inherit; background: none;
+  }
+  .ank-card input.ank-front { font-weight: 600; }
+  .ank-card input.ank-back { color: var(--accent); font-weight: 700; }
+  .ank-card input[type=text]:focus { outline: none; border-bottom-color: var(--accent2); }
+  .ank-note { font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.5; }
+  .ank-del {
+    margin-left: auto; background: none; border: none; color: #c0392b;
+    font-size: 12px; cursor: pointer;
+  }
+  .sheet-actions {
+    position: sticky; bottom: 0; background: var(--bg);
+    padding: 12px 0 4px; display: flex; gap: 8px; flex-wrap: wrap;
+    border-top: 1px solid #e3dcc9;
+  }
+  .btn {
+    flex: 1; min-width: 110px; border: none; border-radius: 10px;
+    padding: 12px 10px; font-size: 13px; font-weight: 700; cursor: pointer;
+    background: #e3dcc9; color: #5a4a2a;
+  }
+  .btn.primary { background: var(--accent); color: #fff; }
+  .btn:disabled { opacity: 0.5; cursor: default; }
+  .hint-text { font-size: 11px; color: var(--muted); line-height: 1.6; margin-top: 10px; }
 </style>
 </head>
 <body>
@@ -168,7 +227,11 @@
 <div id="topbar">
   <div>
     <h1>なぜ？なに？カメラ</h1>
-    <div class="sub">気になるものにかざしてタップ</div>
+    <div class="sub" id="subLabel">気になるものにかざしてタップ</div>
+    <div id="modeSwitch">
+      <button class="mode-btn active" data-mode="explain">🔍 解説</button>
+      <button class="mode-btn" data-mode="anki">🃏 カード化</button>
+    </div>
   </div>
   <div class="top-actions">
     <select id="levelSelect" title="解説レベル">
@@ -178,6 +241,7 @@
       <option value="adult">大人</option>
     </select>
     <button id="bookBtn" onclick="openBook()">図鑑</button>
+    <button id="deckBtn" onclick="openDeck()">🗂 0</button>
   </div>
 </div>
 
@@ -219,6 +283,51 @@
       </div>
     </div>
     <div id="bookGrid"></div>
+  </div>
+</div>
+
+<!-- 生成カードシート -->
+<div id="cardSheet" class="sheet">
+  <div class="handle" onclick="closeCards()"></div>
+  <div class="content">
+    <div class="title">
+      <span id="cardTitle">Ankiカード</span>
+      <div class="title-actions">
+        <button class="icon-btn" onclick="toggleAllCards()">全選択/解除</button>
+        <button class="icon-btn" onclick="closeCards()">閉じる</button>
+      </div>
+    </div>
+    <div id="cardMeta"></div>
+    <input id="deckName" type="text" placeholder="デッキ名（例: 地理::南北アメリカ）">
+    <div id="cardList"></div>
+    <div class="sheet-actions" id="cardActions" style="display:none;">
+      <button class="btn primary" onclick="saveSelectedToDeck()">🗂 デッキに保存</button>
+      <button class="btn" onclick="exportCards('selected')">⬇ TSV書き出し</button>
+      <button class="btn" onclick="copyCards('selected')">📋 コピー</button>
+    </div>
+    <div class="hint-text">
+      ⚠「要確認」バッジは写真から推測した答え。そのまま覚える前に見直してね。<br>
+      Ankiへの入れ方：TSVを書き出す → Anki（PC）で <b>ファイル → 読み込む</b> → デッキとタグは自動。
+    </div>
+  </div>
+</div>
+
+<!-- 保存デッキシート -->
+<div id="deckSheet" class="sheet">
+  <div class="handle" onclick="closeDeck()"></div>
+  <div class="content">
+    <div class="title">
+      <span id="deckTitle">保存したカード</span>
+      <div class="title-actions">
+        <button class="icon-btn" onclick="clearDeck()">全削除</button>
+        <button class="icon-btn" onclick="closeDeck()">閉じる</button>
+      </div>
+    </div>
+    <div id="deckList"></div>
+    <div class="sheet-actions" id="deckActions" style="display:none;">
+      <button class="btn primary" onclick="exportCards('deck')">⬇ 全部TSVで書き出し</button>
+      <button class="btn" onclick="copyCards('deck')">📋 コピー</button>
+    </div>
   </div>
 </div>
 
@@ -467,6 +576,7 @@ document.querySelectorAll('.level-tab').forEach(tab => {
 
 async function capture() {
   if (!video.videoWidth) { showError('カメラ準備中'); return; }
+  if (currentMode === 'anki') { await captureForAnki(); return; }
   shutter.disabled = true;
   result.className = 'loading';
   result.textContent = '考え中...';
@@ -489,6 +599,292 @@ async function capture() {
   // 現在の選択レベルで解析
   await analyzeWithLevel(levelSelect.value);
 }
+
+// ============================================================
+// 🃏 Ankiカード化モード
+// ============================================================
+const DECK_KEY = 'anki_deck_v1';
+const DECK_NAME_KEY = 'anki_deck_name';
+const MODE_KEY = 'zukan_mode';
+
+const cardSheet = document.getElementById('cardSheet');
+const deckSheet = document.getElementById('deckSheet');
+const cardList = document.getElementById('cardList');
+const deckList = document.getElementById('deckList');
+const deckNameInput = document.getElementById('deckName');
+const modeSwitch = document.getElementById('modeSwitch');
+const subLabel = document.getElementById('subLabel');
+const deckBtn = document.getElementById('deckBtn');
+
+let currentMode = localStorage.getItem(MODE_KEY) || 'explain';
+let generatedCards = [];   // 直近の生成結果（編集前の素）
+
+// --- モード切替 ---
+function setMode(mode) {
+  currentMode = mode;
+  localStorage.setItem(MODE_KEY, mode);
+  document.querySelectorAll('.mode-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.mode === mode));
+  levelSelect.style.display = (mode === 'explain') ? '' : 'none';
+  subLabel.textContent = (mode === 'explain')
+    ? '気になるものにかざしてタップ'
+    : '問題集・地図・板書にかざしてタップ';
+}
+modeSwitch.addEventListener('click', (e) => {
+  const btn = e.target.closest('.mode-btn');
+  if (btn) setMode(btn.dataset.mode);
+});
+
+// --- 保存デッキ（localStorage） ---
+function loadDeck() {
+  try { return JSON.parse(localStorage.getItem(DECK_KEY) || '[]'); }
+  catch { return []; }
+}
+function saveDeck(cards) {
+  try { localStorage.setItem(DECK_KEY, JSON.stringify(cards)); }
+  catch { showError('カードの保存に失敗（容量超過）'); }
+  updateDeckBadge();
+}
+function updateDeckBadge() {
+  deckBtn.textContent = '🗂 ' + loadDeck().length;
+}
+
+// --- 撮影 → カード化 ---
+async function captureForAnki() {
+  shutter.disabled = true;
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+  const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+  generatedCards = [];
+  cardList.innerHTML = '<div class="book-empty">読み取り中…<br>項目が多いと30秒ほどかかるよ</div>';
+  document.getElementById('cardActions').style.display = 'none';
+  document.getElementById('cardMeta').textContent = '';
+  document.getElementById('cardTitle').textContent = 'Ankiカード';
+  openCards();
+
+  try {
+    const res = await fetch('/anki', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: dataUrl })
+    });
+    const data = await res.json();
+    if (data.error) {
+      cardList.innerHTML = '<div class="book-empty">⚠ ' + escapeHtml(data.error) + '</div>';
+      return;
+    }
+    if (!data.cards || data.cards.length === 0) {
+      cardList.innerHTML = '<div class="book-empty">' +
+        escapeHtml(data.note_to_user || 'カードにできる項目が見つからなかった。ページ全体が入るように撮ってみて') +
+        '</div>';
+      return;
+    }
+    generatedCards = data.cards.map((c, i) => ({
+      id: Date.now() + i,
+      front: c.front || '',
+      back: c.back || '',
+      note: c.note || '',
+      tags: Array.isArray(c.tags) ? c.tags : [],
+      confidence: c.confidence || 'medium',
+      deck: data.deck || 'なぜなにカメラ',
+      source: data.source || '',
+    }));
+    if (!deckNameInput.value) {
+      deckNameInput.value = localStorage.getItem(DECK_NAME_KEY) || data.deck || 'なぜなにカメラ';
+    }
+    renderCards(data);
+  } catch (e) {
+    cardList.innerHTML = '<div class="book-empty">通信エラー: ' + escapeHtml(e.message) + '</div>';
+  } finally {
+    shutter.disabled = false;
+  }
+}
+
+const CONF_LABEL = { high: '✓ 確度高', medium: '△ 要チェック', low: '⚠ 要確認' };
+
+function escapeHtml(str) {
+  return String(str == null ? '' : str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function renderCards(meta) {
+  document.getElementById('cardTitle').textContent = `Ankiカード（${generatedCards.length}枚）`;
+  const uncertain = generatedCards.filter(c => c.confidence !== 'high').length;
+  document.getElementById('cardMeta').textContent =
+    (meta.source ? meta.source + ' / ' : '') +
+    `${generatedCards.length}枚` + (uncertain ? `（うち${uncertain}枚は答えを推測）` : '');
+
+  cardList.innerHTML = generatedCards.map((c, i) => `
+    <div class="ank-card" data-i="${i}">
+      <label class="ank-head">
+        <input type="checkbox" data-role="use" checked>
+        <span class="badge ${c.confidence}">${CONF_LABEL[c.confidence] || c.confidence}</span>
+        <span>${escapeHtml(c.tags.join(' '))}</span>
+      </label>
+      <input type="text" class="ank-front" data-role="front" value="${escapeHtml(c.front)}">
+      <input type="text" class="ank-back" data-role="back" value="${escapeHtml(c.back)}">
+      ${c.note ? `<div class="ank-note">${escapeHtml(c.note)}</div>` : ''}
+    </div>`).join('');
+
+  cardList.querySelectorAll('input[data-role=use]').forEach(cb => {
+    cb.addEventListener('change', () =>
+      cb.closest('.ank-card').classList.toggle('off', !cb.checked));
+  });
+  document.getElementById('cardActions').style.display = 'flex';
+}
+
+// 画面の編集内容を読み戻す
+function collectCards({ onlySelected = true } = {}) {
+  const out = [];
+  cardList.querySelectorAll('.ank-card').forEach(el => {
+    const i = Number(el.dataset.i);
+    const use = el.querySelector('input[data-role=use]').checked;
+    if (onlySelected && !use) return;
+    const base = generatedCards[i] || {};
+    out.push({
+      ...base,
+      front: el.querySelector('input[data-role=front]').value.trim(),
+      back: el.querySelector('input[data-role=back]').value.trim(),
+    });
+  });
+  return out.filter(c => c.front && c.back);
+}
+
+function toggleAllCards() {
+  const boxes = [...cardList.querySelectorAll('input[data-role=use]')];
+  const next = !boxes.every(b => b.checked);
+  boxes.forEach(b => {
+    b.checked = next;
+    b.closest('.ank-card').classList.toggle('off', !next);
+  });
+}
+
+function openCards() { cardSheet.classList.add('open'); }
+function closeCards() { cardSheet.classList.remove('open'); }
+
+// --- デッキに保存（front+back が同じものは重複させない） ---
+function saveSelectedToDeck() {
+  const picked = collectCards();
+  if (!picked.length) { alert('保存するカードがないよ'); return; }
+  const deckName = deckNameInput.value.trim() || 'なぜなにカメラ';
+  localStorage.setItem(DECK_NAME_KEY, deckName);
+
+  const deck = loadDeck();
+  const seen = new Set(deck.map(c => c.front + '\u0000' + c.back));
+  let added = 0;
+  picked.forEach(c => {
+    const key = c.front + '\u0000' + c.back;
+    if (seen.has(key)) return;
+    seen.add(key);
+    deck.push({ ...c, deck: deckName, date: new Date().toISOString() });
+    added++;
+  });
+  saveDeck(deck);
+  alert(`${added}枚をデッキに保存したよ（合計${deck.length}枚）`);
+}
+
+// --- 保存デッキの表示 ---
+function openDeck() { renderDeck(); deckSheet.classList.add('open'); }
+function closeDeck() { deckSheet.classList.remove('open'); }
+function clearDeck() {
+  if (!confirm('保存したカードを全部消す？')) return;
+  saveDeck([]); renderDeck();
+}
+function deleteDeckCard(id) {
+  saveDeck(loadDeck().filter(c => c.id !== id));
+  renderDeck();
+}
+function renderDeck() {
+  const deck = loadDeck();
+  document.getElementById('deckTitle').textContent = `保存したカード（${deck.length}枚）`;
+  document.getElementById('deckActions').style.display = deck.length ? 'flex' : 'none';
+  if (!deck.length) {
+    deckList.innerHTML = '<div class="book-empty">まだカードがないよ。<br>🃏カード化モードで問題集を撮ってみよう</div>';
+    return;
+  }
+  deckList.innerHTML = deck.map(c => `
+    <div class="ank-card">
+      <div class="ank-head">
+        <span class="badge ${c.confidence || 'medium'}">${CONF_LABEL[c.confidence] || ''}</span>
+        <span>${escapeHtml(c.deck || '')}</span>
+        <button class="ank-del" onclick="deleteDeckCard(${c.id})">削除</button>
+      </div>
+      <div style="font-weight:600;font-size:14px;">${escapeHtml(c.front)}</div>
+      <div style="color:var(--accent);font-weight:700;font-size:14px;margin-top:4px;">${escapeHtml(c.back)}</div>
+      ${c.note ? `<div class="ank-note">${escapeHtml(c.note)}</div>` : ''}
+    </div>`).join('');
+}
+
+// --- TSV書き出し（Ankiの「ファイル → 読み込む」にそのまま入る） ---
+function oneLine(s) { return String(s || '').replace(/[\t\r\n]+/g, ' ').trim(); }
+
+function toTSV(cards, deckName) {
+  const header = [
+    '#separator:tab',
+    '#html:false',
+    '#notetype:Basic',
+    '#deck:' + oneLine(deckName || 'なぜなにカメラ'),
+    '#tags column:3',
+    '',
+  ].join('\n');
+  const rows = cards.map(c => {
+    const back = c.note ? `${oneLine(c.back)}（${oneLine(c.note)}）` : oneLine(c.back);
+    const tags = (c.tags || []).map(t => oneLine(t).replace(/\s+/g, '_')).filter(Boolean);
+    if (c.confidence && c.confidence !== 'high') tags.push('要確認');
+    return [oneLine(c.front), back, tags.join(' ')].join('\t');
+  });
+  return header + rows.join('\n') + '\n';
+}
+
+function cardsFor(scope) {
+  if (scope === 'deck') return loadDeck();
+  return collectCards();
+}
+function deckNameFor(scope) {
+  if (scope === 'deck') {
+    const deck = loadDeck();
+    return (deck[0] && deck[0].deck) || 'なぜなにカメラ';
+  }
+  return deckNameInput.value.trim() || 'なぜなにカメラ';
+}
+
+function exportCards(scope) {
+  const cards = cardsFor(scope);
+  if (!cards.length) { alert('書き出すカードがないよ'); return; }
+  const tsv = toTSV(cards, deckNameFor(scope));
+  const stamp = new Date().toISOString().slice(0, 10);
+  downloadText(`anki_${stamp}_${cards.length}枚.txt`, tsv);
+}
+
+async function copyCards(scope) {
+  const cards = cardsFor(scope);
+  if (!cards.length) { alert('コピーするカードがないよ'); return; }
+  const tsv = toTSV(cards, deckNameFor(scope));
+  try {
+    await navigator.clipboard.writeText(tsv);
+    alert(`${cards.length}枚ぶんコピーしたよ。Ankiの読み込み用ファイルに貼り付けてね`);
+  } catch {
+    window.prompt('コピーしてね（長押し→全選択）', tsv);
+  }
+}
+
+function downloadText(filename, text) {
+  const blob = new Blob([text], { type: 'text/tab-separated-values;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+setMode(currentMode);
+updateDeckBadge();
 
 shutter.addEventListener('click', capture);
 initCamera();
