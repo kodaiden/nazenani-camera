@@ -1,7 +1,7 @@
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { StatusBar } from 'expo-status-bar';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -15,6 +15,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
 import { analyze, Level, LEVELS } from './src/api';
 import { Markdown } from './src/Markdown';
+import { loadLevel, saveLevel } from './src/storage';
 
 const C = {
   accent: '#8b4513',
@@ -40,13 +41,28 @@ function Main() {
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [shooting, setShooting] = useState(false);
+  // 同じ写真で学年を行き来したときに再リクエストしないためのキャッシュ
+  const cache = useRef<Partial<Record<Level, string>>>({});
+  const loadingMessage = useLoadingMessage(loading);
+
+  useEffect(() => {
+    loadLevel().then((lv) => lv && setLevel(lv));
+  }, []);
 
   async function run(base64: string, lv: Level) {
-    setLoading(true);
+    const cached = cache.current[lv];
     setError(null);
+    if (cached) {
+      setResult(cached);
+      return;
+    }
+    setLoading(true);
     setResult(null);
     try {
-      setResult(await analyze(base64, lv));
+      const text = await analyze(base64, lv);
+      cache.current[lv] = text;
+      setResult(text);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -55,6 +71,18 @@ function Main() {
   }
 
   async function shoot() {
+    if (shooting) return;
+    setShooting(true);
+    try {
+      await capture();
+    } catch {
+      setError('うまく撮れなかったみたい。もう一回試してみて');
+    } finally {
+      setShooting(false);
+    }
+  }
+
+  async function capture() {
     const pic = await cameraRef.current?.takePictureAsync({ quality: 1 });
     if (!pic) return;
     // サーバーに送る前に長辺1024pxへ縮める
@@ -66,12 +94,14 @@ function Main() {
     const rendered = await ctx.renderAsync();
     const saved = await rendered.saveAsync({ format: SaveFormat.JPEG, compress: 0.7, base64: true });
     if (!saved.base64) return;
+    cache.current = {};
     setPhoto({ uri: saved.uri, base64: saved.base64 });
     run(saved.base64, level);
   }
 
   function changeLevel(lv: Level) {
     setLevel(lv);
+    saveLevel(lv);
     if (photo && !loading) run(photo.base64, lv);
   }
 
@@ -115,7 +145,7 @@ function Main() {
           {loading && (
             <View style={styles.center}>
               <ActivityIndicator color={C.accent} />
-              <Text style={styles.muted}>でんでんが考えてる…</Text>
+              <Text style={styles.muted}>{loadingMessage}</Text>
             </View>
           )}
           {error && <Text style={styles.error}>{error}</Text>}
@@ -134,11 +164,31 @@ function Main() {
       ) : (
         <View style={styles.cameraWrap}>
           <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" />
-          <Pressable style={styles.shutter} onPress={shoot} accessibilityLabel="撮影する" />
+          <Pressable
+            style={[styles.shutter, shooting && styles.shutterBusy]}
+            onPress={shoot}
+            disabled={shooting}
+            accessibilityLabel="撮影する"
+          />
         </View>
       )}
     </SafeAreaView>
   );
+}
+
+// 待ち時間が長くなるほど言葉を変えて、固まってないことを伝える
+function useLoadingMessage(active: boolean) {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    if (!active) return;
+    setElapsed(0);
+    const id = setInterval(() => setElapsed((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [active]);
+  if (elapsed < 6) return 'でんでんが見てる…';
+  if (elapsed < 15) return 'どうやって動いてるか考えてる…';
+  if (elapsed < 40) return 'もうちょっと待ってね。最初の1回は時間がかかることがあるんだ';
+  return 'サーバーを起こしてるところ…あと少し！';
 }
 
 const styles = StyleSheet.create({
@@ -170,6 +220,7 @@ const styles = StyleSheet.create({
     borderWidth: 5,
     borderColor: 'rgba(0,0,0,0.25)',
   },
+  shutterBusy: { opacity: 0.5 },
   resultWrap: { padding: 16, gap: 16 },
   thumb: { width: '100%', aspectRatio: 4 / 3, borderRadius: 12, backgroundColor: '#ddd' },
   body: { fontSize: 16, lineHeight: 26, color: C.text },

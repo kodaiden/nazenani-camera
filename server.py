@@ -4,6 +4,10 @@
 """
 import os
 import base64
+import hmac
+import threading
+import time
+from collections import defaultdict, deque
 from pathlib import Path
 from flask import Flask, request, jsonify, send_file
 from anthropic import Anthropic
@@ -153,9 +157,58 @@ def png(filename):
         return send_file(p, mimetype="image/png")
     return ("not found", 404)
 
+# --- 乱用対策 ---------------------------------------------------------------
+# APP_KEY が設定されていれば X-App-Key ヘッダーを必須にする(未設定ならローカル開発用に素通し)。
+# アプリに埋め込む値なので完全な秘密ではない。端末ごと・全体の回数制限と組み合わせて守る。
+APP_KEY = os.environ.get("APP_KEY", "")
+LIMIT_PER_HOUR = int(os.environ.get("LIMIT_PER_HOUR", 20))
+LIMIT_PER_DAY = int(os.environ.get("LIMIT_PER_DAY", 60))
+GLOBAL_LIMIT_PER_DAY = int(os.environ.get("GLOBAL_LIMIT_PER_DAY", 1000))
+MAX_IMAGE_B64 = 3_000_000  # 1024px JPEG なら十分収まる
+
+_hits = defaultdict(deque)  # client_id -> 直近24時間のリクエスト時刻
+_global_hits = deque()
+_lock = threading.Lock()
+
+
+def _client_id():
+    device = request.headers.get("X-Device-Id", "")[:64]
+    ip = request.headers.get("X-Forwarded-For", request.remote_addr or "").split(",")[0].strip()
+    return f"dev:{device}" if device else f"ip:{ip}"
+
+
+def _check_limits():
+    """制限内なら None、超えていたら (メッセージ, ステータス) を返す"""
+    now = time.time()
+    day_ago, hour_ago = now - 86400, now - 3600
+    with _lock:
+        while _global_hits and _global_hits[0] < day_ago:
+            _global_hits.popleft()
+        if len(_global_hits) >= GLOBAL_LIMIT_PER_DAY:
+            return "今日はみんなが使いすぎちゃったみたい。また明日来てね", 503
+
+        hits = _hits[_client_id()]
+        while hits and hits[0] < day_ago:
+            hits.popleft()
+        if len(hits) >= LIMIT_PER_DAY:
+            return "今日はもうたくさん調べたね！また明日いっしょに見よう", 429
+        if sum(1 for t in hits if t >= hour_ago) >= LIMIT_PER_HOUR:
+            return "ちょっと休憩しよう。少ししたらまた撮ってみて", 429
+
+        hits.append(now)
+        _global_hits.append(now)
+    return None
+
+
 @app.route("/analyze", methods=["POST"])
 def analyze():
-    data = request.get_json(force=True)
+    if APP_KEY and not hmac.compare_digest(request.headers.get("X-App-Key", ""), APP_KEY):
+        return jsonify({"error": "unauthorized"}), 401
+
+    data = request.get_json(force=True, silent=True) or {}
+    if len(data.get("image", "")) > MAX_IMAGE_B64:
+        return jsonify({"error": "画像が大きすぎるみたい"}), 413
+
     image_b64 = data.get("image", "")
     level = data.get("level", "hs")
     system_prompt = PROMPTS.get(level, PROMPT_HS)
@@ -164,6 +217,11 @@ def analyze():
 
     if not image_b64:
         return jsonify({"error": "画像が空"}), 400
+
+    limited = _check_limits()
+    if limited:
+        msg, status = limited
+        return jsonify({"error": msg}), status
 
     try:
         resp = client.messages.create(
@@ -188,13 +246,14 @@ def analyze():
         text = resp.content[0].text
         return jsonify({"text": text})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        app.logger.exception("analyze failed")
+        return jsonify({"error": "うまく解説できなかった。もう一回試してみて"}), 500
 
 
 if __name__ == "__main__":
     if not os.environ.get("ANTHROPIC_API_KEY"):
         print("⚠ ANTHROPIC_API_KEY 環境変数がセットされていません")
         print("  set ANTHROPIC_API_KEY=sk-ant-xxxx で設定してから起動してください")
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 5001))
     print(f"\n🎥 なぜ？なに？カメラ 起動 (port={port})")
     app.run(host="0.0.0.0", port=port, debug=False)
