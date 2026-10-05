@@ -8,7 +8,8 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.prademic.nazenanicamera"
+      "bundleIdentifier": "com.prademic.nazenanicamera",
+      "appleTeamId": "9ZXZ5JGZQ9"
     },
     "android": {
       "adaptiveIcon": {
@@ -40,7 +41,12 @@
           "image": "./assets/splash-icon.png",
           "imageWidth": 180
         }
-      ]
-    ]
+      ],
+      "expo-router"
+    ],
+    "scheme": "nazenani",
+    "experiments": {
+      "typedRoutes": true
+    }
   }
 }
