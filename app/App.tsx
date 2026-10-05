@@ -185,10 +185,10 @@ function useLoadingMessage(active: boolean) {
     const id = setInterval(() => setElapsed((t) => t + 1), 1000);
     return () => clearInterval(id);
   }, [active]);
-  if (elapsed < 6) return 'でんでんが見てる…';
-  if (elapsed < 15) return 'どうやって動いてるか考えてる…';
-  if (elapsed < 40) return 'もうちょっと待ってね。最初の1回は時間がかかることがあるんだ';
-  return 'サーバーを起こしてるところ…あと少し！';
+  if (elapsed < 6) return 'じっくり観察中…';
+  if (elapsed < 15) return 'しくみを調べてる…';
+  if (elapsed < 40) return 'もう少し待ってね。最初の1回は時間がかかることがあるよ';
+  return 'サーバーを準備中…あと少し';
 }
 
 const styles = StyleSheet.create({
