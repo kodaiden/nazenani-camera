@@ -16,14 +16,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { analyze, Level, LEVELS } from './src/api';
 import { Markdown } from './src/Markdown';
 import { loadLevel, saveLevel } from './src/storage';
-
-const C = {
-  accent: '#8b4513',
-  accent2: '#2a6b8f',
-  bg: '#f5f1e6',
-  text: '#2b2b2b',
-  muted: '#7a7264',
-};
+import { C } from './src/theme';
 
 export default function App() {
   return (
@@ -109,9 +102,12 @@ function Main() {
 
   if (!permission.granted) {
     return (
-      <SafeAreaView style={[styles.root, styles.center]}>
+      <SafeAreaView style={[styles.root, styles.permWrap]}>
+        <Image source={require('./assets/icon.png')} style={styles.permIcon} />
         <Text style={styles.permTitle}>なぜ？なに？カメラ</Text>
-        <Text style={[styles.body, styles.centerText]}>気になるものを撮るには、{'\n'}カメラを使わせてね</Text>
+        <Text style={styles.permBody}>
+          気になるものを撮ると、{'\n'}そのしくみを解説します
+        </Text>
         <Pressable style={styles.primary} onPress={requestPermission}>
           <Text style={styles.primaryText}>カメラを使う</Text>
         </Pressable>
@@ -119,57 +115,83 @@ function Main() {
     );
   }
 
+  function retake() {
+    setPhoto(null);
+    setResult(null);
+    setError(null);
+  }
+
   return (
     <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
       <StatusBar style="dark" />
       <View style={styles.header}>
+        <Image source={require('./assets/icon.png')} style={styles.logo} />
         <Text style={styles.title}>なぜ？なに？カメラ</Text>
       </View>
 
-      <View style={styles.tabs}>
-        {LEVELS.map((l) => (
-          <Pressable
-            key={l.id}
-            onPress={() => changeLevel(l.id)}
-            disabled={loading}
-            style={[styles.tab, level === l.id && styles.tabActive]}
-          >
-            <Text style={[styles.tabText, level === l.id && styles.tabTextActive]}>{l.label}</Text>
-          </Pressable>
-        ))}
+      <View style={styles.levels}>
+        {LEVELS.map((l) => {
+          const active = level === l.id;
+          return (
+            <Pressable
+              key={l.id}
+              onPress={() => changeLevel(l.id)}
+              disabled={loading}
+              style={[styles.level, active && styles.levelActive]}
+            >
+              <Text style={[styles.levelText, active && styles.levelTextActive]}>{l.label}</Text>
+            </Pressable>
+          );
+        })}
       </View>
 
       {photo ? (
-        <ScrollView contentContainerStyle={styles.resultWrap}>
-          <Image source={{ uri: photo.uri }} style={styles.thumb} />
-          {loading && (
-            <View style={styles.center}>
-              <ActivityIndicator color={C.accent} />
-              <Text style={styles.muted}>{loadingMessage}</Text>
-            </View>
-          )}
-          {error && <Text style={styles.error}>{error}</Text>}
-          {result && <Markdown text={result} />}
-          <Pressable
-            style={styles.primary}
-            onPress={() => {
-              setPhoto(null);
-              setResult(null);
-              setError(null);
-            }}
-          >
-            <Text style={styles.primaryText}>もう一回撮る</Text>
-          </Pressable>
-        </ScrollView>
+        <>
+          <ScrollView contentContainerStyle={styles.resultWrap}>
+            <Image source={{ uri: photo.uri }} style={styles.photo} />
+            {loading && (
+              <View style={[styles.card, styles.loadingCard]}>
+                <ActivityIndicator color={C.orange} size="large" />
+                <Text style={styles.loadingText}>{loadingMessage}</Text>
+              </View>
+            )}
+            {error && (
+              <View style={[styles.card, styles.errorCard]}>
+                <Text style={styles.errorText}>{error}</Text>
+              </View>
+            )}
+            {result && (
+              <View style={styles.card}>
+                <Markdown text={result} />
+              </View>
+            )}
+          </ScrollView>
+          <View style={styles.footer}>
+            <Pressable style={styles.primary} onPress={retake}>
+              <Text style={styles.primaryText}>もう一回撮る</Text>
+            </Pressable>
+          </View>
+        </>
       ) : (
         <View style={styles.cameraWrap}>
           <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" />
+          <View style={styles.hint}>
+            <Text style={styles.hintText}>気になるものをまんなかに</Text>
+          </View>
+          <View pointerEvents="none" style={styles.frame}>
+            <View style={[styles.corner, styles.cTL]} />
+            <View style={[styles.corner, styles.cTR]} />
+            <View style={[styles.corner, styles.cBL]} />
+            <View style={[styles.corner, styles.cBR]} />
+          </View>
           <Pressable
             style={[styles.shutter, shooting && styles.shutterBusy]}
             onPress={shoot}
             disabled={shooting}
             accessibilityLabel="撮影する"
-          />
+          >
+            <View style={styles.shutterInner} />
+          </Pressable>
         </View>
       )}
     </SafeAreaView>
@@ -191,48 +213,101 @@ function useLoadingMessage(active: boolean) {
   return 'サーバーを準備中…あと少し';
 }
 
+const CORNER = 28;
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
-  center: { alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 },
-  header: { backgroundColor: C.accent, paddingVertical: 12, paddingHorizontal: 16 },
-  title: { fontSize: 18, fontWeight: '700', color: '#fff' },
-  permTitle: { fontSize: 22, fontWeight: '700', color: C.accent },
-  tabs: {
-    flexDirection: 'row',
-    margin: 12,
-    padding: 3,
-    backgroundColor: '#ede7d8',
+  header: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, paddingTop: 8 },
+  logo: { width: 34, height: 34, borderRadius: 9 },
+  title: { fontSize: 20, fontWeight: '800', color: C.ink, letterSpacing: 0.5 },
+
+  levels: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingVertical: 12 },
+  level: {
+    flex: 1,
+    paddingVertical: 9,
+    borderRadius: 999,
+    alignItems: 'center',
+    backgroundColor: C.card,
+    borderWidth: 1.5,
+    borderColor: C.line,
+  },
+  levelActive: { backgroundColor: C.orange, borderColor: C.orange },
+  levelText: { fontSize: 15, fontWeight: '700', color: C.inkSoft },
+  levelTextActive: { color: '#fff' },
+
+  cameraWrap: {
+    flex: 1,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 28,
+    overflow: 'hidden',
+    backgroundColor: '#000',
+  },
+  hint: {
+    position: 'absolute',
+    top: 16,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(43,33,24,0.55)',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
     borderRadius: 999,
   },
-  tab: { flex: 1, paddingVertical: 8, borderRadius: 999, alignItems: 'center' },
-  tabActive: { backgroundColor: '#fff' },
-  tabText: { color: '#666', fontSize: 14 },
-  tabTextActive: { color: C.accent, fontWeight: '700' },
-  cameraWrap: { flex: 1, marginHorizontal: 12, marginBottom: 12, borderRadius: 16, overflow: 'hidden' },
+  hintText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  frame: { position: 'absolute', top: '22%', bottom: '28%', left: '14%', right: '14%' },
+  corner: { position: 'absolute', width: CORNER, height: CORNER, borderColor: C.sun },
+  cTL: { top: 0, left: 0, borderTopWidth: 4, borderLeftWidth: 4, borderTopLeftRadius: 12 },
+  cTR: { top: 0, right: 0, borderTopWidth: 4, borderRightWidth: 4, borderTopRightRadius: 12 },
+  cBL: { bottom: 0, left: 0, borderBottomWidth: 4, borderLeftWidth: 4, borderBottomLeftRadius: 12 },
+  cBR: { bottom: 0, right: 0, borderBottomWidth: 4, borderRightWidth: 4, borderBottomRightRadius: 12 },
   shutter: {
     position: 'absolute',
     bottom: 28,
     alignSelf: 'center',
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: '#fff',
-    borderWidth: 5,
-    borderColor: 'rgba(0,0,0,0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
+  shutterInner: { width: 62, height: 62, borderRadius: 31, backgroundColor: C.orange },
   shutterBusy: { opacity: 0.5 },
-  resultWrap: { padding: 16, gap: 16 },
-  thumb: { width: '100%', aspectRatio: 4 / 3, borderRadius: 12, backgroundColor: '#ddd' },
-  body: { fontSize: 16, lineHeight: 26, color: C.text },
-  centerText: { textAlign: 'center' },
-  muted: { color: C.muted },
-  error: { color: '#c0392b' },
+
+  resultWrap: { paddingHorizontal: 16, paddingBottom: 24, gap: 14 },
+  photo: {
+    width: '100%',
+    height: 220,
+    borderRadius: 24,
+    borderWidth: 4,
+    borderColor: C.card,
+    backgroundColor: C.line,
+  },
+  card: {
+    backgroundColor: C.card,
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1.5,
+    borderColor: C.line,
+  },
+  loadingCard: { alignItems: 'center', gap: 12, paddingVertical: 28 },
+  loadingText: { color: C.inkSoft, fontSize: 15, fontWeight: '600', textAlign: 'center' },
+  errorCard: { backgroundColor: C.dangerSoft, borderColor: C.dangerSoft },
+  errorText: { color: C.danger, fontSize: 15, lineHeight: 22 },
+
+  footer: { paddingHorizontal: 16, paddingTop: 8, paddingBottom: 8 },
   primary: {
-    backgroundColor: C.accent,
-    paddingVertical: 14,
+    backgroundColor: C.orange,
+    paddingVertical: 16,
     borderRadius: 999,
     alignItems: 'center',
     paddingHorizontal: 32,
+    borderBottomWidth: 4,
+    borderBottomColor: C.orangeDark,
   },
-  primaryText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  primaryText: { color: '#fff', fontSize: 17, fontWeight: '800' },
+
+  permWrap: { alignItems: 'center', justifyContent: 'center', gap: 16, padding: 32 },
+  permIcon: { width: 120, height: 120, borderRadius: 30, marginBottom: 8 },
+  permTitle: { fontSize: 26, fontWeight: '800', color: C.ink },
+  permBody: { fontSize: 16, lineHeight: 26, color: C.inkSoft, textAlign: 'center', marginBottom: 8 },
 });
